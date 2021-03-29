@@ -19,124 +19,142 @@ const graph = {
 
 var orders = [
     {
-        "order": 1, 
+        "order": 4,
         "pickCity": "Miami",
         "dropCity": "Nashville",
         "pallets": 5
     },
     {
-        "order": 2, 
+        "order": 3,
         "pickCity": "Miami",
-        "dropCity": "Miami",
+        "dropCity": "Atlanta",
         "pallets": 5
     },
     {
-        "order": 3, 
-        "pickCity": "Miami",
-        "dropCity": "Charlotte",
-        "pallets": 10
-    },
-    {
-        "order": 4, 
-        "pickCity": "Miami",
-        "dropCity": "Atlanta",
-        "pallets": 10
-    },
-    {
-        "order": 5, 
-        "pickCity": "Miami",
-        "dropCity": "Houston",
-        "pallets": 8
-    },
-    {
-        "order": 6, 
+        "order": 1,
         "pickCity": "Miami",
         "dropCity": "Jacksonville",
-        "pallets": 6
+        "pallets": 5
     },
     {
-        "order": 7, 
+        "order": 2,
         "pickCity": "Miami",
-        "dropCity": "New_Orleans",
-        "pallets": 9
-    },
+        "dropCity": "Orlando",
+        "pallets": 5
+    }
+
 ]
+    
 
-
+    
 var callback = function(error, retval){
     if (error){
         console.log(error)
         return;
     }
-    console.log(retval)
+    
+    retval.forEach(value => {
+        console.log(value);
+    });
+
 };
 
-var optimizeLoads = function(incomingOrders, executeFor, callback){
-
-    if (executeFor == null){
-        executeFor = 30000;
-    }
-
-    let timeElapsed = setTimeout(function() {
-         callback(new Error("The program ran out of time!"));
-      }, executeFor)
-   
-    timeElapsed;
+var optimizeLoads = function(incomingOrders, executeFor, callback){   
     
     try {
 
-        handleOrders(incomingOrders);
+        if (executeFor == null || executeFor < 0){
+            executeFor = 30000;
+        }
+
+        var loads = handleOrders(incomingOrders, executeFor);
 
         //when done
-        callback(null, 'Successful!');
+        callback(null, loads);
 
 
     }
     catch(err) {
-        callback(new Error("Unknown Error!"));
+        callback(new Error(err));
     }
 }
 
-function handleOrders(orders) {
+function handleOrders(orders, executeFor) {
+
+    var loads = [];
 
     var currentLoad = 1;
+    var endLoop = false;
+    var stopIfAfter = Date.now() + executeFor;
 
-    while (orders.length > 0){
-        var arrayForLoad = [];
+    while (endLoop == false) {
+        while (orders.length > 0){
 
-        var currentOrder = orders[0];
-        arrayForLoad.push(currentOrder);
+            if (Date.now() > stopIfAfter){
+                endLoop = true;
+                return loads;
+            }
 
-        _.remove(orders, function(e) {
-            return e === currentOrder;
-        })
+            var arrayForLoad = [];
 
-        var path = findShortestPathWithDijkstra(graph, currentOrder.pickCity, currentOrder.dropCity).path;
-        var distance = findShortestPathWithDijkstra(graph, currentOrder.pickCity, currentOrder.dropCity).distance;
+            var currentOrder;
+            var path;
+            var distance = 0;
 
-        orders.forEach(order => {
-            //is this order on path
-        if (isOrderOnPath(order.dropCity, path)){
-                //does order exceed pallet count
-                if (orderCanFit(arrayForLoad, order.pallets)){
-                    arrayForLoad.push(order);
-                    _.remove(orders, function(e) {
-                        return e === order;
-                    })
+            orders.forEach(order => {
+                var currentPath = findShortestPathWithDijkstra(graph, order.pickCity, order.dropCity).path;
+                var currentDistance = findShortestPathWithDijkstra(graph, order.pickCity, order.dropCity).distance;
+
+                if (currentDistance > distance){
+                    distance = currentDistance;
+                    path = currentPath;
+                    distance = currentDistance;
+                    currentOrder = order;
+                } 
+
+            });
+
+            arrayForLoad.push(currentOrder);
+
+            _.remove(orders, function(e) {
+                return e === currentOrder;
+            })
+
+
+            orders.forEach(order => {
+                //is this order on path
+                if (isOrderOnPath(order.dropCity, path)){
+                        //does order exceed pallet count
+                        if (orderCanFit(arrayForLoad, order.pallets)){
+                            arrayForLoad.push(order);
+                        }
                 }
-        }
-        });
+            });
 
-        convertToLoad(arrayForLoad, path, distance, currentLoad);
-        currentLoad++;
+            arrayForLoad.forEach(loadOrder => {
+                orders.forEach(order => {
+                    if (loadOrder == order){
+                        _.remove(orders, function(e) {
+                            return e === order;
+                        })
+                    }
+                });
+            })
+
+
+            loads.push(convertToLoad(arrayForLoad, path, distance, currentLoad));
+            currentLoad++;
+        }
+        return loads;
     }
+
 }
+
 
 function isOrderOnPath(dropCity, listOfCities){
 
     var f = false;
     var t = false;
-    
 
     listOfCities.forEach(drop => {
         if (drop == dropCity){
@@ -220,10 +238,10 @@ function convertToLoad(arrayForLoad, path, totalMiles, currentLoad){
         }
     ]
 
-    console.log(json);
+    return (json);
 
 }
 
 
-optimizeLoads(orders, 350000, callback);
+optimizeLoads(orders, 10, callback);
 process.exit(1);
